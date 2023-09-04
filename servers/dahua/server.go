@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time" 
 )
 
 type DhCamera struct {
@@ -22,6 +23,7 @@ type DhCamera struct {
 	Channel  string   `json:"channel"`
 	Events   []string `json:"events"`
 	client   *http.Client
+	Online   bool #Add
 }
 
 type Server struct {
@@ -60,13 +62,17 @@ func (camera *DhCamera) readEvents(channel chan<- DhEvent, callback func()) {
 		fmt.Printf("DAHUA: Error: Could not connect to camera %s\n", camera.Name)
 		fmt.Println("DAHUA: Error", err)
 		callback()
-		return
+                camera.Online = false // Marque a câmera como offline
+                time.Sleep(5 * time.Second)
+		continue
 	}
+	camera.Online = true #//INCLUIDO
 	if camera.client.Transport == nil { // BASIC AUTH
 		request.SetBasicAuth(camera.Username, camera.Password)
 	}
 
 	response, err := camera.client.Do(request)
+
 	if err != nil {
 		fmt.Printf("DAHUA: Error opening HTTP connection to camera %s\n", camera.Name)
 		fmt.Println(err)
@@ -183,9 +189,9 @@ func (server *Server) addCamera(waitGroup *sync.WaitGroup, cam *DhCamera, channe
 	request, err := http.NewRequest("GET", cam.Url+"/cgi-bin/configManager.cgi?action=getConfig&name=General", nil)
 	if err != nil {
 		fmt.Printf("DAHUA: Error probing auth method for camera %s\n", cam.Name)
-		fmt.Println(err)
-		return
+		fmt.Println("DAHUA: Error",err)
 	}
+	camera.Online = true
 	request.SetBasicAuth(cam.Username, cam.Password)
 	response, err := cam.client.Do(request)
 	if err != nil {
